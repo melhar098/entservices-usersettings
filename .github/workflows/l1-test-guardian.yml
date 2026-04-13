@@ -178,10 +178,23 @@ jobs:
           issue_url="$(gh issue create \
             --repo "$REPO" \
             --title "$title" \
-            --body-file "$body_file" \
-            --assignee copilot)"
+            --body-file "$body_file")"
 
           echo "Created issue: $issue_url"
+
+          # Auto-assign to copilot using REST API with custom agent
+          issue_number="${issue_url##*/}"
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/$REPO/issues/$issue_number/assignees" \
+            --input - <<< "{
+              \"assignees\": [\"copilot-swe-agent[bot]\"],
+              \"agent_assignment\": {
+                \"custom_agent\": \"l1-test-guardian\"
+              }
+            }"
 
       - name: Skip because issue already exists
         if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate == 'true'
