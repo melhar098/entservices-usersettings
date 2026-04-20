@@ -47,7 +47,10 @@ const std::map<string, string> UserSettingsImplementation::usersettingsDefaultMa
                          {USERSETTINGS_VOICE_GUIDANCE_RATE_KEY, "1"},
                          {USERSETTINGS_VOICE_GUIDANCE_HINTS_KEY, "false"},
                          {USERSETTINGS_CONTENT_PIN_KEY, ""},
-                         {USERSETTINGS_PRIVACY_MODE_KEY, "SHARE"}};
+                         {USERSETTINGS_PRIVACY_MODE_KEY, "SHARE"},
+                         {USERSETTINGS_DISPLAY_BRIGHTNESS_KEY, "75"},
+                         {USERSETTINGS_COLOR_SCHEME_KEY, "auto"},
+                         {USERSETTINGS_FONT_SIZE_KEY, "16"}};
 
 const std::map<Exchange::IUserSettingsInspector::SettingsKey, string> UserSettingsImplementation::_userSettingsInspectorMap =
          {{Exchange::IUserSettingsInspector::SettingsKey::PREFERRED_AUDIO_LANGUAGES, USERSETTINGS_PREFERRED_AUDIO_LANGUAGES_KEY},
@@ -1049,6 +1052,102 @@ Core::hresult UserSettingsImplementation::GetContentPin(string& contentPin) cons
     Core::hresult status = Core::ERROR_GENERAL;
 
     status = GetUserSettingsValue(USERSETTINGS_CONTENT_PIN_KEY, contentPin);
+    return status;
+}
+
+// TODO: TEMPORARY TEST APIs - Remove after L1 agent testing
+Core::hresult UserSettingsImplementation::SetDisplayBrightness(const uint32_t brightness)
+{
+    Core::hresult status = Core::ERROR_GENERAL;
+
+    LOGINFO("brightness: %u", brightness);
+    if (brightness >= 0 && brightness <= 100)
+    {
+        status = SetUserSettingsValue(USERSETTINGS_DISPLAY_BRIGHTNESS_KEY, std::to_string(brightness));
+    }
+    else
+    {
+        LOGERR("Invalid brightness value: %u (must be 0-100)", brightness);
+        status = Core::ERROR_INVALID_PARAMETER;
+    }
+    return status;
+}
+
+Core::hresult UserSettingsImplementation::GetDisplayBrightness(uint32_t &brightness) const
+{
+    Core::hresult status = Core::ERROR_GENERAL;
+    std::string value = "";
+
+    status = GetUserSettingsValue(USERSETTINGS_DISPLAY_BRIGHTNESS_KEY, value);
+    if (Core::ERROR_NONE == status)
+    {
+        try {
+            brightness = std::stoul(value);
+        } catch (const std::exception& e) {
+            LOGERR("Failed to convert brightness value: %s", e.what());
+            status = Core::ERROR_GENERAL;
+        }
+    }
+    return status;
+}
+
+Core::hresult UserSettingsImplementation::SetColorScheme(const string& scheme)
+{
+    Core::hresult status = Core::ERROR_GENERAL;
+
+    LOGINFO("scheme: %s", scheme.c_str());
+    if (scheme == "light" || scheme == "dark" || scheme == "auto")
+    {
+        status = SetUserSettingsValue(USERSETTINGS_COLOR_SCHEME_KEY, scheme);
+    }
+    else
+    {
+        LOGERR("Invalid color scheme: %s (must be light, dark, or auto)", scheme.c_str());
+        status = Core::ERROR_INVALID_PARAMETER;
+    }
+    return status;
+}
+
+Core::hresult UserSettingsImplementation::GetColorScheme(string &scheme) const
+{
+    Core::hresult status = Core::ERROR_GENERAL;
+
+    status = GetUserSettingsValue(USERSETTINGS_COLOR_SCHEME_KEY, scheme);
+    return status;
+}
+
+Core::hresult UserSettingsImplementation::SetFontSize(const uint32_t fontSize)
+{
+    Core::hresult status = Core::ERROR_GENERAL;
+
+    LOGINFO("fontSize: %u", fontSize);
+    if (fontSize >= 12 && fontSize <= 24)
+    {
+        status = SetUserSettingsValue(USERSETTINGS_FONT_SIZE_KEY, std::to_string(fontSize));
+    }
+    else
+    {
+        LOGERR("Invalid font size: %u (must be 12-24)", fontSize);
+        status = Core::ERROR_INVALID_PARAMETER;
+    }
+    return status;
+}
+
+Core::hresult UserSettingsImplementation::GetFontSize(uint32_t &fontSize) const
+{
+    Core::hresult status = Core::ERROR_GENERAL;
+    std::string value = "";
+
+    status = GetUserSettingsValue(USERSETTINGS_FONT_SIZE_KEY, value);
+    if (Core::ERROR_NONE == status)
+    {
+        try {
+            fontSize = std::stoul(value);
+        } catch (const std::exception& e) {
+            LOGERR("Failed to convert font size value: %s", e.what());
+            status = Core::ERROR_GENERAL;
+        }
+    }
     return status;
 }
 

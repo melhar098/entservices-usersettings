@@ -54,6 +54,11 @@
 #define USERSETTINGS_VOICE_GUIDANCE_HINTS_KEY                 "voiceGuidanceHints"
 #define USERSETTINGS_CONTENT_PIN_KEY                          "contentPin"
 
+// TODO: TEMPORARY TEST KEYS - Remove after L1 agent testing
+#define USERSETTINGS_DISPLAY_BRIGHTNESS_KEY                   "displayBrightness"
+#define USERSETTINGS_COLOR_SCHEME_KEY                         "colorScheme"
+#define USERSETTINGS_FONT_SIZE_KEY                            "fontSize"
+
 namespace WPEFramework {
 namespace Plugin {
     class UserSettingsImplementation : public Exchange::IUserSettings,
@@ -218,6 +223,14 @@ namespace Plugin {
         Core::hresult GetVoiceGuidanceHints(bool &hints) const override;
         Core::hresult SetContentPin(const string& contentPin) override;
         Core::hresult GetContentPin(string& contentPin) const override;
+
+        // TODO: TEMPORARY TEST APIs - Remove after L1 agent testing
+        Core::hresult SetDisplayBrightness(const uint32_t brightness);
+        Core::hresult GetDisplayBrightness(uint32_t &brightness) const;
+        Core::hresult SetColorScheme(const string& scheme);
+        Core::hresult GetColorScheme(string &scheme) const;
+        Core::hresult SetFontSize(const uint32_t fontSize);
+        Core::hresult GetFontSize(uint32_t &fontSize) const;
 
         // IUserSettingsInspector methods
         Core::hresult GetMigrationState(const SettingsKey key, bool &requiresMigration) const override;
