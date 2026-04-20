@@ -1,0 +1,225 @@
+name: L1 Test Agent Trigger
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main, develop, 'sprint/**', 'release/**']
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  trigger-l1-agent:
+    name: Trigger L1 Test Coverage Agent
+    runs-on: ubuntu-latest
+    
+    # Skip if PR is from the agent itself to avoid recursion
+    if: |
+      !startsWith(github.head_ref, 'l1-agent/') &&
+      !startsWith(github.event.pull_request.title, '[L1:') &&
+      !contains(github.event.pull_request.labels.*.name, 'l1-agent') &&
+      !contains(github.event.pull_request.labels.*.name, 'automated-tests')
+    
+    steps:
+      - name: Check if PR has source code changes
+        id: check_changes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            
+            // Check if PR includes C++ source files
+            const hasSourceChanges = files.some(file => {
+              const path = file.filename;
+              return (
+                (path.includes('plugin/') || path.includes('helpers/')) &&
+                (path.endsWith('.cpp') || path.endsWith('.h') || path.endsWith('.hpp'))
+              );
+            });
+            
+            // Check if only docs/config changed
+            const onlyDocsOrConfig = files.every(file => {
+              const path = file.filename;
+              return (
+                path.endsWith('.md') ||
+                path.endsWith('.yml') ||
+                path.endsWith('.yaml') ||
+                path.endsWith('.json') ||
+                path.endsWith('.txt') ||
+                path.includes('.github/') ||
+                path.includes('docs/')
+              );
+            });
+            
+            core.setOutput('has_source_changes', hasSourceChanges);
+            core.setOutput('skip_agent', onlyDocsOrConfig);
+            
+            return { hasSourceChanges, onlyDocsOrConfig };
+
+      - name: Get Copilot agent ID
+        if: steps.check_changes.outputs.skip_agent != 'true'
+        id: get_agent_id
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Query for Copilot agent bot ID and debug output
+          echo "Querying for Copilot agent in repository..."
+          
+          RESPONSE=$(gh api graphql -f query='
+            query {
+              repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+                suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 100) {
+                  nodes {
+                    login
+                    __typename
+                    ... on Bot {
+                      id
+                    }
+                    ... on User {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          ')
+          
+          echo "Response: $RESPONSE"
+          
+          # Try to find copilot-swe-agent[bot] first, then copilot-swe-agent
+          AGENT_ID=$(echo "$RESPONSE" | jq -r '.data.repository.suggestedActors.nodes[] | select(.login == "copilot-swe-agent[bot]" or .login == "copilot-swe-agent") | .id' | head -n1)
+          
+          if [ -z "$AGENT_ID" ]; then
+            echo "::warning::Copilot agent not found in suggestedActors. Available actors:"
+            echo "$RESPONSE" | jq -r '.data.repository.suggestedActors.nodes[].login'
+            echo "::warning::Copilot cloud agent may not be enabled for this repository or subscription"
+            exit 0
+          fi
+          
+          echo "Found Copilot agent with ID: $AGENT_ID"
+          echo "agent_id=$AGENT_ID" >> $GITHUB_OUTPUT
+
+      - name: Get repository ID
+        if: steps.check_changes.outputs.skip_agent != 'true' && steps.get_agent_id.outputs.agent_id != ''
+        id: get_repo_id
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REPO_ID=$(gh api graphql -f query='
+            query {
+              repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+                id
+              }
+            }
+          ' --jq '.data.repository.id')
+          
+          echo "repo_id=$REPO_ID" >> $GITHUB_OUTPUT
+
+      - name: Create issue and assign to Copilot with custom agent
+        if: steps.check_changes.outputs.skip_agent != 'true' && steps.get_agent_id.outputs.agent_id != ''
+        id: create_issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Create issue title and body with PR context
+          ISSUE_TITLE="[L1 Test Analysis] PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+          
+          ISSUE_BODY="Automated L1 test coverage analysis for PR #${{ github.event.pull_request.number }}
+          
+          **PR Details:**
+          - Title: ${{ github.event.pull_request.title }}
+          - Author: @${{ github.event.pull_request.user.login }}
+          - Branch: \`${{ github.head_ref }}\` → \`${{ github.base_ref }}\`
+          - PR URL: ${{ github.event.pull_request.html_url }}
+          
+          **Instructions:**
+          Please analyze the changes in PR #${{ github.event.pull_request.number }} and determine if L1 test coverage is adequate.
+          
+          - Review changed source files in plugin/ and helpers/ directories
+          - Analyze existing L1 test files in Tests/L1Tests/
+          - If tests are adequate, comment on this issue explaining why and close it
+          - If tests are missing, create a separate PR with comprehensive L1 test coverage
+          
+          Do not create a PR if the existing tests already provide adequate coverage."
+          
+          echo "Creating issue and assigning to Copilot agent..."
+          
+          # Create issue and assign to Copilot with custom agent
+          RESULT=$(gh api graphql \
+            -H 'GraphQL-Features: issues_copilot_assignment_api_support,coding_agent_model_selection' \
+            -f query='
+              mutation($repoId: ID!, $botId: ID!, $title: String!, $body: String!, $baseRef: String!) {
+                createIssue(input: {
+                  repositoryId: $repoId,
+                  title: $title,
+                  body: $body,
+                  assigneeIds: [$botId],
+                  agentAssignment: {
+                    targetRepositoryId: $repoId,
+                    baseRef: $baseRef,
+                    customAgent: "l1-test-agent",
+                    customInstructions: "Analyze PR #${{ github.event.pull_request.number }} for L1 test coverage. Review the changed source code and existing tests. Only create a test PR if coverage is inadequate."
+                  }
+                }) {
+                  issue {
+                    id
+                    number
+                    url
+                  }
+                }
+              }
+            ' \
+            -f repoId='${{ steps.get_repo_id.outputs.repo_id }}' \
+            -f botId='${{ steps.get_agent_id.outputs.agent_id }}' \
+            -f title="$ISSUE_TITLE" \
+            -f body="$ISSUE_BODY" \
+            -f baseRef='${{ github.base_ref }}')
+          
+          echo "Result: $RESULT"
+          
+          ISSUE_URL=$(echo "$RESULT" | jq -r '.data.createIssue.issue.url')
+          ISSUE_NUMBER=$(echo "$RESULT" | jq -r '.data.createIssue.issue.number')
+          
+          echo "Created issue #$ISSUE_NUMBER: $ISSUE_URL"
+          echo "issue_url=$ISSUE_URL" >> $GITHUB_OUTPUT
+          echo "issue_number=$ISSUE_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR
+        if: steps.check_changes.outputs.has_source_changes == 'true' && steps.create_issue.outputs.issue_number != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = '${{ steps.create_issue.outputs.issue_number }}';
+            const issueUrl = '${{ steps.create_issue.outputs.issue_url }}';
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: `🤖 **L1 Test Agent Triggered**\n\nThe L1 test coverage agent has been assigned to analyze this PR in issue #${issueNumber}.\n\nThe agent will:\n\n1. Review the changed source files\n2. Analyze existing L1 test coverage\n3. Determine if additional tests are needed\n4. Create a separate test PR if coverage is inadequate, or comment if tests are sufficient\n\nYou can track the agent's progress:\n- Issue: ${issueUrl}\n- [Agents panel](https://github.com/copilot/agents)`
+            });
+
+      - name: Copilot not available warning
+        if: steps.check_changes.outputs.has_source_changes == 'true' && steps.get_agent_id.outputs.agent_id == ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: '⚠️ **L1 Test Agent Not Available**\n\nGitHub Copilot cloud agent is not available for this repository. This could be because:\n\n- Copilot cloud agent is not enabled for this repository\n- The account does not have a Copilot Pro, Pro+, Business, or Enterprise subscription\n- The repository is owned by a managed user account\n\nPlease review L1 test coverage manually or contact your repository administrator.'
+            });
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.skip_agent == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            console.log('Skipping L1 agent - PR only contains documentation or configuration changes');
