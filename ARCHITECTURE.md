@@ -62,6 +62,7 @@ The UserSettings plugin is a Thunder/WPEFramework-based service that provides a 
      - Store notifications: Listens to PersistentStore changes
      - Client notifications: Broadcasts changes to registered clients
    - Event-driven architecture ensures consistency across components
+   - Events fired for each setting change, including `OnScreenReaderSpeedChanged`
 
 ## Data Flow
 
@@ -101,7 +102,7 @@ Client Update → JSON-RPC Handler → UserSettingsImplementation
 ## Technical Implementation
 
 ### Settings Management
-The plugin manages 18 different user settings categorized into:
+The plugin manages 19 different user settings categorized into:
 
 1. **Audio Settings**
    - Audio description (boolean)
@@ -127,6 +128,7 @@ The plugin manages 18 different user settings categorized into:
    - Voice guidance enabled (boolean)
    - Voice guidance rate (numeric: 0.1-10)
    - Voice guidance hints (boolean)
+   - Screen reader speed (uint8)
 
 5. **Privacy Settings**
    - Privacy mode (string)
