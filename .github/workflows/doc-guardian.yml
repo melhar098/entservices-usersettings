@@ -1,0 +1,285 @@
+name: doc-guardian
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main, develop, 'sprint/**', 'release/**']
+  schedule:
+    - cron: '0 22 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  evaluate-and-enqueue:
+    name: Detect missing or outdated documentation and enqueue Copilot
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'pull_request' ||
+      (github.actor != 'dependabot[bot]' &&
+       github.actor != 'copilot[bot]' &&
+       !contains(github.event.pull_request.user.login, 'copilot') &&
+       !startsWith(github.event.pull_request.title, '[DOCS]'))
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Evaluate change set
+        id: evaluate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          # Prevent self-trigger loops on Copilot-generated documentation PRs.
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            if [[ "$PR_TITLE" =~ ^\[DOCS\] ]] || [[ "${PR_AUTHOR,,}" == *"copilot"* ]]; then
+              echo "needs_agent=false" >> "$GITHUB_OUTPUT"
+              echo "reason=Skipped automation PR to avoid recursive agent loop (author=$PR_AUTHOR, title=$PR_TITLE)" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+
+          tmp_files="$(mktemp)"
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            gh api "repos/$REPO/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename' > "$tmp_files"
+            scope_label="PR #$PR_NUMBER"
+          else
+            git fetch origin "$DEFAULT_BRANCH" --depth=200
+            git log --since='24 hours ago' --name-only --pretty=format: "origin/$DEFAULT_BRANCH" \
+              | sed '/^$/d' \
+              | sort -u > "$tmp_files"
+            scope_label="default branch commits in last 24h"
+          fi
+
+          total_changed="$(wc -l < "$tmp_files" | tr -d ' ')"
+          if [[ "$total_changed" -eq 0 ]]; then
+            echo "needs_agent=false" >> "$GITHUB_OUTPUT"
+            echo "reason=No file changes detected for evaluation scope" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Patterns for source files that should have documentation
+          source_regex='\.(c|cc|cpp|cxx|h|hh|hpp)$|CMakeLists\.txt$|\.cmake$|\.conf\.in$|\.config$'
+          
+          # Ignore test files, build artifacts, and other non-documentation-relevant files
+          ignored_regex='(^|/)Tests/|(^|/)build/|(^|/)\.github/workflows/|(^|/)\.git'
+          
+          # Documentation files
+          doc_regex='(^|/)(PRODUCT|ARCHITECTURE|README)\.md$|(^|/)docs?/.*\.md$|(^|/)CHANGELOG\.md$'
+
+          src_changed=false
+          doc_changed=false
+          significant_change=false
+
+          while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+
+            # Check if source/config files changed
+            if [[ "$file" =~ $source_regex ]] && [[ ! "$file" =~ $ignored_regex ]]; then
+              src_changed=true
+              
+              # Check if it's a significant change (not just whitespace/comments)
+              # For now, we'll treat any source change as potentially significant
+              significant_change=true
+            fi
+
+            # Check if documentation was updated
+            if [[ "$file" =~ $doc_regex ]]; then
+              doc_changed=true
+            fi
+          done < "$tmp_files"
+
+          if [[ "$significant_change" == "true" && "$doc_changed" == "false" ]]; then
+            echo "needs_agent=true" >> "$GITHUB_OUTPUT"
+            echo "reason=Source changes without documentation updates in $scope_label" >> "$GITHUB_OUTPUT"
+          elif [[ "$significant_change" == "true" && "$doc_changed" == "true" ]]; then
+            # Even if docs were updated, agent can verify completeness
+            echo "needs_agent=true" >> "$GITHUB_OUTPUT"
+            echo "reason=Source and documentation changed in $scope_label - verifying completeness" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_agent=false" >> "$GITHUB_OUTPUT"
+            echo "reason=No documentation-requiring changes in $scope_label (src_changed=$src_changed, significant=$significant_change)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Show decision
+        run: |
+          echo "needs_agent=${{ steps.evaluate.outputs.needs_agent }}"
+          echo "reason=${{ steps.evaluate.outputs.reason }}"
+
+      - name: Find duplicate open issue
+        if: steps.evaluate.outputs.needs_agent == 'true'
+        id: dedupe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            key="PR #$PR_NUMBER"
+          else
+            key="daily scan"
+          fi
+
+          existing="$(gh issue list \
+            --repo "$REPO" \
+            --state open \
+            --search "[Doc-Guardian] in:title $key" \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [[ -n "$existing" ]]; then
+            echo "duplicate=true" >> "$GITHUB_OUTPUT"
+            echo "issue_number=$existing" >> "$GITHUB_OUTPUT"
+          else
+            echo "duplicate=false" >> "$GITHUB_OUTPUT"
+            echo "issue_number=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build issue body
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate != 'true'
+        id: build_issue
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PYEOF'
+          import os
+          import tempfile
+
+          event_name = os.environ.get("EVENT_NAME", "")
+          pr_number = os.environ.get("PR_NUMBER", "")
+          pr_title = os.environ.get("PR_TITLE", "")
+          pr_head_sha = os.environ.get("PR_HEAD_SHA", "")
+
+          if event_name == "pull_request":
+              title = f"[Doc-Guardian] Generate or update documentation for PR #{pr_number}"
+              subject = f"PR #{pr_number}"
+              subject_details = f"PR title: {pr_title}\nHead SHA: {pr_head_sha}"
+          else:
+              title = "[Doc-Guardian] Daily scan detected source changes without documentation updates"
+              subject = "daily scan"
+              subject_details = "Scope: commits on default branch in the last 24 hours"
+
+          lines = [
+              "@copilot",
+              "",
+              "/agent doc-guardian",
+              "",
+              f"Please run the doc-guardian workflow for {subject}.",
+              "",
+              subject_details,
+              "",
+              "Required behavior:",
+              "1. Analyze changed source files and existing documentation.",
+              "2. Identify what documentation needs to be created or updated.",
+              "3. Generate or update PRODUCT.md, ARCHITECTURE.md, README.md, and docs/ as needed.",
+              "4. Open a PR against rdkcentral develop branch with the documentation changes.",
+              "5. When opening the PR, include this exact line in the PR body: `Doc-Guardian-Issue: #<this_issue_number>`",
+              "6. Ensure documentation is accurate, complete, and matches the actual code.",
+              "7. Report documentation status and any areas needing SME review.",
+              "",
+              "Note: The doc-guardian agent file contains comprehensive documentation guidelines from the RDK documentation standards.",
+              "",
+          ]
+          body = "\n".join(lines)
+
+          with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
+              f.write(body)
+              body_file = f.name
+
+          out_path = os.environ["GITHUB_OUTPUT"]
+          with open(out_path, "a") as out:
+              out.write(f"title={title}\n")
+              out.write(f"body_file={body_file}\n")
+          PYEOF
+
+      - name: Open Copilot issue to run custom agent
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate != 'true'
+        id: open_issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          issue_url="$(gh issue create \
+            --repo "$REPO" \
+            --title "${{ steps.build_issue.outputs.title }}" \
+            --body-file "${{ steps.build_issue.outputs.body_file }}")"
+
+          echo "Created issue: $issue_url"
+          echo "issue_url=$issue_url" >> "$GITHUB_OUTPUT"
+
+      - name: Add PR linkage instructions for agent
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_URL: ${{ steps.open_issue.outputs.issue_url }}
+        run: |
+          set -euo pipefail
+
+          issue_number="${ISSUE_URL##*/}"
+
+          comment_body="$(printf '@copilot One requirement when opening the documentation PR:\nInclude this exact line in the PR body: Doc-Guardian-Issue: #%s\n\nTarget the rdkcentral develop branch for the documentation updates.' "$issue_number")"
+
+          gh issue comment "$issue_number" \
+            --repo "$REPO" \
+            --body "$comment_body"
+
+          echo "Posted PR linkage instruction on issue #$issue_number"
+          
+      - name: Assign issue to Copilot agent
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.COPILOT_PAT }}
+          REPO: ${{ github.repository }}
+          ISSUE_URL: ${{ steps.open_issue.outputs.issue_url }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "COPILOT_PAT is empty. Add repo secret COPILOT_PAT with a PAT from a user who can assign Copilot agents."
+            exit 1
+          fi
+          
+          # Auto-assign to copilot using REST API with custom agent
+          issue_number="${ISSUE_URL##*/}"
+          gh api \
+            --method POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/$REPO/issues/$issue_number/assignees" \
+            --input - <<< "{
+              \"assignees\": [\"copilot-swe-agent[bot]\"],
+              \"agent_assignment\": {
+                \"custom_agent\": \"doc-guardian\"
+              }
+            }"
+
+          echo "Assigned issue #$issue_number to Copilot with custom agent doc-guardian"
+
+      - name: Skip because issue already exists
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate == 'true'
+        run: |
+          echo "Skipped creating a new issue; existing issue #${{ steps.dedupe.outputs.issue_number }} is already open."
