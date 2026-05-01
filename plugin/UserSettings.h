@@ -187,6 +187,12 @@ namespace Plugin {
                     Exchange::JUserSettings::Event::OnContentPinChanged(_parent, contentPin);
                 }
 
+                void OnScreenReaderSpeedChanged(const uint8_t speed) override
+                {
+                    LOGINFO("ScreenReaderSpeedChanged: %d\n", speed);
+                    Exchange::JUserSettings::Event::OnScreenReaderSpeedChanged(_parent, speed);
+                }
+
             private:
                 UserSettings& _parent;
         };

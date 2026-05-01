@@ -53,6 +53,7 @@
 #define USERSETTINGS_VOICE_GUIDANCE_RATE_KEY                  "voiceGuidanceRate"
 #define USERSETTINGS_VOICE_GUIDANCE_HINTS_KEY                 "voiceGuidanceHints"
 #define USERSETTINGS_CONTENT_PIN_KEY                          "contentPin"
+#define USERSETTINGS_SCREEN_READER_SPEED_KEY                  "screenReaderSpeed"
 
 namespace WPEFramework {
 namespace Plugin {
