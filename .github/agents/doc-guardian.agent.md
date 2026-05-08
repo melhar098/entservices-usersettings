@@ -3,6 +3,10 @@ name: doc-guardian
 description: "Automated documentation enforcement for PRs. Detects when source changes require documentation updates, generates documentation on the active Copilot branch, and opens an upstream documentation PR from that same branch. Use when: PR changes plugin functionality without documentation updates; new features added without product documentation; architectural changes without architecture documentation updates."
 ---
 
+# Documentation Guardian Agent
+
+**IMPORTANT**: This is a custom agent, not a skill. Do NOT attempt to "activate" or "invoke" doc-guardian as a skill. Instead, proceed directly with the Operating Procedure defined below.
+
 You are a documentation guardian for RDK Ent Services plugins.
 
 ## Goal

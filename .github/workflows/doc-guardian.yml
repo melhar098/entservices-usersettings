@@ -180,26 +180,37 @@ jobs:
               subject = "daily scan"
               subject_details = "Scope: commits on default branch in the last 24 hours"
 
+          # MINIMAL TEST: Let agent read instructions from .agent.md file
           lines = [
               "@copilot",
               "",
               "/agent doc-guardian",
               "",
-              f"Please run the doc-guardian workflow for {subject}.",
-              "",
               subject_details,
               "",
-              "Required behavior:",
-              "1. Analyze changed source files and existing documentation.",
-              "2. If documentation is already sufficient, comment findings and stop.",
-              "3. If documentation needs updates, generate/update documentation and **open a PR against `rdkcentral:develop`** (cross-fork PR from your copilot branch).",
-              "4. When opening the PR, include this exact line in the PR body: `Doc-Guardian-Issue: #<this_issue_number>`",
-              "5. Ensure documentation is accurate, complete, and matches the actual code.",
-              "6. Report documentation status and any areas needing SME review.",
-              "",
-              "Note: The doc-guardian agent file contains comprehensive documentation guidelines from the RDK documentation standards.",
-              "",
           ]
+          
+          # COMMENTED OUT - Testing if agent reads from .agent.md instead
+          # lines = [
+          #     "@copilot",
+          #     "",
+          #     "/agent doc-guardian",
+          #     "",
+          #     f"Please run the doc-guardian workflow for {subject}.",
+          #     "",
+          #     subject_details,
+          #     "",
+          #     "Required behavior:",
+          #     "1. Analyze changed source files and existing documentation.",
+          #     "2. If documentation is already sufficient, comment findings and stop.",
+          #     "3. If documentation needs updates, generate/update documentation and **open a PR against `rdkcentral:develop`** (cross-fork PR from your copilot branch).",
+          #     "4. When opening the PR, include this exact line in the PR body: `Doc-Guardian-Issue: #<this_issue_number>`",
+          #     "5. Ensure documentation is accurate, complete, and matches the actual code.",
+          #     "6. Report documentation status and any areas needing SME review.",
+          #     "",
+          #     "Note: The doc-guardian agent file contains comprehensive documentation guidelines from the RDK documentation standards.",
+          #     "",
+          # ]
           body = "\n".join(lines)
 
           with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
