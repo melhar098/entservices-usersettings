@@ -101,7 +101,7 @@ Client Update → JSON-RPC Handler → UserSettingsImplementation
 ## Technical Implementation
 
 ### Settings Management
-The plugin manages 18 different user settings categorized into:
+The plugin manages 19 different user settings categorized into:
 
 1. **Audio Settings**
    - Audio description (boolean)
@@ -127,6 +127,7 @@ The plugin manages 18 different user settings categorized into:
    - Voice guidance enabled (boolean)
    - Voice guidance rate (numeric: 0.1-10)
    - Voice guidance hints (boolean)
+   - Screen reader speed (numeric: 0-255, stored as `screenReaderSpeed`)
 
 5. **Privacy Settings**
    - Privacy mode (string)
