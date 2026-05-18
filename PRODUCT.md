@@ -34,7 +34,14 @@ The plugin manages a complete spectrum of user preferences across five key categ
    - Adjustable voice guidance speech rate (0.1x to 10x)
    - Voice guidance hints and prompts
 
-5. **Privacy Settings**
+5. **Display & Visual Settings**
+   - Manual display brightness control (0–100%)
+   - Automatic brightness mode toggled on/off based on ambient light
+   - Color scheme selection (light, dark, or auto)
+   - Font size adjustment (12–24 pt)
+   - Screen timeout configuration (0 = never, or 30–3600 seconds)
+
+6. **Privacy Settings**
    - Privacy mode configuration for data collection preferences
 
 #### Real-Time Synchronization
