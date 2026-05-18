@@ -43,7 +43,6 @@ The plugin manages a complete spectrum of user preferences across six key catego
    - Persist a screen timeout value in seconds (default `300`; `0` disables timeout; otherwise `30-3600`)
    - Persist a color scheme preference of `light`, `dark`, or `auto` (default `auto`)
    - Persist a font size preference (default `16`, validated range `12-24`)
-   - **[Verification Needed]** The current PR adds these display settings in `UserSettingsImplementation`, but matching JSON-RPC or `IUserSettings` interface exposure is not visible in the checked-in source diff
 
 #### Real-Time Synchronization
 - Event-driven notification system ensures all applications receive immediate updates when settings change
@@ -99,13 +98,15 @@ The plugin exposes a comprehensive JSON-RPC API with methods for:
 - **Setters**: Update individual settings with validation
 - **Events**: Real-time notifications for all setting changes
 
-**Display settings note:** the checked-in PR changes add implementation-level getters, setters, and default values for display brightness, auto-brightness mode, color scheme, font size, and screen timeout. **[Verification Needed]** Matching public JSON-RPC registration is not present in the current source diff.
-
 ### COM-RPC Interfaces
 For native service integration:
 - `IUserSettings`: Standard user settings interface for get/set operations
 - `IUserSettingsInspector`: Bulk query interface for efficient multi-setting retrieval
 - `IConfiguration`: Plugin configuration interface
+
+### Implementation Status
+- The checked-in PR changes add implementation-level getters, setters, and default values for display brightness, auto-brightness mode, color scheme, font size, and screen timeout
+- **[Verification Needed]** Matching public `IUserSettings`, JSON-RPC registration, notification wiring, and inspector-map exposure for these display settings are not visible in the checked-in source diff
 
 ### Integration Benefits
 1. **Zero-Configuration Discovery**: Automatic discovery via Thunder framework

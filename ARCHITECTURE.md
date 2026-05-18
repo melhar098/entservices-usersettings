@@ -92,7 +92,7 @@ Client Update → JSON-RPC Handler → UserSettingsImplementation
   - font size: `12-24`
   - screen timeout: `0` or `30-3600`
 - When auto-brightness mode is enabled, `SetDisplayBrightness()` still validates and stores the requested value, while logging that manual brightness will be ignored until auto mode is disabled
-- **[Verification Needed]** Matching `IUserSettings`, JSON-RPC registration, notification wiring, and inspector-map exposure for these display settings are not visible in the checked-in PR diff
+- See `PRODUCT.md` -> `Implementation Status` for the consolidated public-interface verification note for these display settings
 
 ## Plugin Framework Integration
 
