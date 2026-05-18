@@ -7,6 +7,8 @@ on:
         description: 'PR number to analyze for documentation'
         required: true
         type: number
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
   contents: read
@@ -17,6 +19,8 @@ jobs:
   evaluate-and-enqueue:
     name: Detect missing or outdated documentation and enqueue Copilot
     runs-on: ubuntu-latest
+    # Skip drafts when triggered by pull_request event
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,7 +32,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
         run: |
           set -euo pipefail
           
@@ -44,7 +48,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
         run: |
           set -euo pipefail
           
@@ -69,7 +73,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
@@ -133,7 +137,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
@@ -159,7 +163,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           LINKED_ISSUE: ${{ steps.check_linked.outputs.linked_issue_number }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
           PR_TITLE: ${{ steps.pr_details.outputs.pr_title }}
           PR_HEAD_SHA: ${{ steps.pr_details.outputs.pr_head_sha }}
         run: |
@@ -202,7 +206,7 @@ jobs:
         if: steps.evaluate.outputs.needs_agent == 'true' && steps.check_linked.outputs.has_linked_issue != 'true' && steps.dedupe.outputs.duplicate != 'true'
         id: build_issue
         env:
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ inputs.pr_number || github.event.pull_request.number }}
           PR_TITLE: ${{ steps.pr_details.outputs.pr_title }}
           PR_HEAD_SHA: ${{ steps.pr_details.outputs.pr_head_sha }}
         run: |
@@ -308,5 +312,5 @@ jobs:
       - name: Used existing linked issue
         if: steps.evaluate.outputs.needs_agent == 'true' && steps.check_linked.outputs.has_linked_issue == 'true'
         run: |
-          echo "Used existing linked issue #${{ steps.check_linked.outputs.linked_issue_number }} from PR #${{ inputs.pr_number }}"
+          echo "Used existing linked issue #${{ steps.check_linked.outputs.linked_issue_number }} from PR #${{ inputs.pr_number || github.event.pull_request.number }}"
           echo "Agent invocation comment added and agent assigned to issue."
