@@ -17,6 +17,8 @@ Enforce documentation coverage for plugin code changes. When a PR modifies sourc
 3. Create a PR with documentation updates targeting the develop branch
 4. Report documentation status and completeness
 
+**Note:** When invoked on an existing issue, look for your task details in the invocation comment (containing `@copilot` and `/agent doc-guardian`), not the issue title or original description.
+
 ## Operating Procedure
 
 ### Phase 1: Detect Documentation Gaps
