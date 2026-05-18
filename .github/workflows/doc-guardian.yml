@@ -38,6 +38,31 @@ jobs:
           
           echo "pr_title=$pr_title" >> "$GITHUB_OUTPUT"
           echo "pr_head_sha=$pr_head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check for existing linked issues
+        id: check_linked
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+          
+          # Check if PR is linked to any issues (via Fixes/Closes/Resolves keywords)
+          linked_issue="$(gh pr view "$PR_NUMBER" \
+            --repo "$REPO" \
+            --json closingIssuesReferences \
+            --jq '.closingIssuesReferences[0].number // empty')"
+          
+          if [[ -n "$linked_issue" ]]; then
+            echo "Found linked issue: #$linked_issue"
+            echo "has_linked_issue=true" >> "$GITHUB_OUTPUT"
+            echo "linked_issue_number=$linked_issue" >> "$GITHUB_OUTPUT"
+          else
+            echo "No linked issues found for PR #$PR_NUMBER"
+            echo "has_linked_issue=false" >> "$GITHUB_OUTPUT"
+            echo "linked_issue_number=" >> "$GITHUB_OUTPUT"
+          fi
           
       - name: Evaluate change set
         id: evaluate
@@ -103,7 +128,7 @@ jobs:
           echo "reason=${{ steps.evaluate.outputs.reason }}"
 
       - name: Find duplicate open issue
-        if: steps.evaluate.outputs.needs_agent == 'true'
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.check_linked.outputs.has_linked_issue != 'true'
         id: dedupe
         env:
           GH_TOKEN: ${{ github.token }}
@@ -127,8 +152,44 @@ jobs:
             echo "issue_number=" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Use existing linked issue
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.check_linked.outputs.has_linked_issue == 'true'
+        id: use_linked
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          LINKED_ISSUE: ${{ steps.check_linked.outputs.linked_issue_number }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_TITLE: ${{ steps.pr_details.outputs.pr_title }}
+          PR_HEAD_SHA: ${{ steps.pr_details.outputs.pr_head_sha }}
+        run: |
+          set -euo pipefail
+          
+          echo "Using existing linked issue #$LINKED_ISSUE for documentation updates"
+          
+          # Add agent invocation comment to existing issue
+          comment_body=$(cat <<EOF
+          @copilot
+
+          /agent doc-guardian
+
+          PR title: $PR_TITLE
+          Head SHA: $PR_HEAD_SHA
+
+          📝 Documentation updates requested for PR #$PR_NUMBER
+          EOF
+          )
+          
+          gh issue comment "$LINKED_ISSUE" \
+            --repo "$REPO" \
+            --body "$comment_body"
+          
+          echo "Added agent invocation comment to existing issue #$LINKED_ISSUE"
+          echo "issue_number=$LINKED_ISSUE" >> "$GITHUB_OUTPUT"
+          echo "issue_url=https://github.com/$REPO/issues/$LINKED_ISSUE" >> "$GITHUB_OUTPUT"
+
       - name: Build issue body
-        if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate != 'true'
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.check_linked.outputs.has_linked_issue != 'true' && steps.dedupe.outputs.duplicate != 'true'
         id: build_issue
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
@@ -167,7 +228,7 @@ jobs:
           PYEOF
 
       - name: Open Copilot issue to run custom agent
-        if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate != 'true'
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.check_linked.outputs.has_linked_issue != 'true' && steps.dedupe.outputs.duplicate != 'true'
         id: open_issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -184,7 +245,7 @@ jobs:
           echo "issue_url=$issue_url" >> "$GITHUB_OUTPUT"
 
       - name: Add PR linkage instructions for agent
-        if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate != 'true'
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.check_linked.outputs.has_linked_issue != 'true' && steps.dedupe.outputs.duplicate != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -203,13 +264,13 @@ jobs:
           echo "Posted PR linkage instruction on issue #$issue_number"
           
       - name: Assign issue to Copilot agent
-        if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate != 'true'
+        if: steps.evaluate.outputs.needs_agent == 'true' && (steps.check_linked.outputs.has_linked_issue == 'true' || (steps.check_linked.outputs.has_linked_issue != 'true' && steps.dedupe.outputs.duplicate != 'true'))
         env:
           # Use DOC_COPILOT_PAT if available, otherwise fall back to default github.token
           # DOC_COPILOT_PAT should be a repository secret with Contents (write), Issues (write), Pull Requests (write)
           GH_TOKEN: ${{ secrets.DOC_COPILOT_PAT || github.token }}
           REPO: ${{ github.repository }}
-          ISSUE_URL: ${{ steps.open_issue.outputs.issue_url }}
+          ISSUE_URL: ${{ steps.use_linked.outputs.issue_url || steps.open_issue.outputs.issue_url }}
         run: |
           set -euo pipefail
           
@@ -230,6 +291,12 @@ jobs:
           echo "Assigned issue #$issue_number to Copilot with custom agent doc-guardian"
 
       - name: Skip because issue already exists
-        if: steps.evaluate.outputs.needs_agent == 'true' && steps.dedupe.outputs.duplicate == 'true'
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.check_linked.outputs.has_linked_issue != 'true' && steps.dedupe.outputs.duplicate == 'true'
         run: |
           echo "Skipped creating a new issue; existing issue #${{ steps.dedupe.outputs.issue_number }} is already open."
+
+      - name: Used existing linked issue
+        if: steps.evaluate.outputs.needs_agent == 'true' && steps.check_linked.outputs.has_linked_issue == 'true'
+        run: |
+          echo "Used existing linked issue #${{ steps.check_linked.outputs.linked_issue_number }} from PR #${{ inputs.pr_number }}"
+          echo "Agent invocation comment added and agent assigned to issue."
