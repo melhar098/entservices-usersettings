@@ -101,6 +101,15 @@ For each documentation file requiring updates:
 
 ### Phase 4: Commit and Create PR
 
+**Environment-Aware Behavior:**
+
+- **If running on GitHub.com** (assigned to an issue via workflow):
+  Follow all steps below to commit, push, and create a PR automatically.
+
+- **If running locally in VS Code**:
+  Skip this entire phase. Do not commit, push, or create PRs.
+  Instead, report: "Documentation changes completed. Files modified: [list]. Review the changes in your working directory."
+
 1. Verify current branch:
    - Detect the current branch name and store it as `CURRENT_BRANCH` (expected pattern: `copilot/...`).
    - All generated documentation changes must be committed to `CURRENT_BRANCH`.
@@ -171,9 +180,9 @@ For each documentation file requiring updates:
    - Note any missing information from source code
    - Identify areas needing technical review
 
-3. Return summary to user with:
-   - Documentation PR link
-   - Coverage report (what was documented)
+3. Return summary to user:
+   - **If PR was created (GitHub.com):** Include documentation PR link and coverage report
+   - **If running locally (VS Code):** List modified files and suggest manual review
    - Any manual follow-up needed (e.g., SME validation)
 
 ## Input Detection
