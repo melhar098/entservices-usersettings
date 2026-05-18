@@ -1,6 +1,7 @@
 ---
 name: doc-guardian
 description: "Automated documentation enforcement for PRs. Detects when source changes require documentation updates, generates documentation on the active Copilot branch, and opens a PR targeting the develop branch. Use when: PR changes plugin functionality without documentation updates; new features added without product documentation; architectural changes without architecture documentation updates."
+model: "Claude Sonnet 4.6"
 ---
 
 # Documentation Guardian Agent
