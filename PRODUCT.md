@@ -7,7 +7,7 @@ The UserSettings plugin provides a unified, persistent user preferences manageme
 ### Core Features
 
 #### Comprehensive Settings Management
-The plugin manages a complete spectrum of user preferences across five key categories:
+The plugin manages a complete spectrum of user preferences across six key categories:
 
 1. **Audio Preferences**
    - Enable/disable audio description for visually impaired users
@@ -37,6 +37,13 @@ The plugin manages a complete spectrum of user preferences across five key categ
 5. **Privacy Settings**
    - Privacy mode configuration for data collection preferences
 
+6. **Display & Visual Settings**
+   - Display brightness control (0–100, validated range)
+   - Auto-brightness mode for ambient-light-driven brightness adjustment
+   - Color scheme selection (light, dark, or auto)
+   - Font size adjustment (12–24pt)
+   - Screen timeout configuration (0 = never, or 30–3600 seconds)
+
 #### Real-Time Synchronization
 - Event-driven notification system ensures all applications receive immediate updates when settings change
 - Cross-application consistency: settings modified by one app are instantly reflected in all other apps
@@ -61,6 +68,13 @@ The plugin manages a complete spectrum of user preferences across five key categ
 - Multiple user profiles can be implemented using the UserSettings API
 - Consistent caption and audio preferences across all streaming apps
 - Centralized privacy settings management for data collection opt-in/opt-out
+- Adaptive display experience: auto-brightness mode adjusts brightness based on ambient light; users can also select preferred color scheme (light/dark/auto) and font size
+
+### Display-Adaptive Environments
+**Scenario**: Devices used in varied lighting conditions (living rooms, outdoor kiosks, etc.)
+- Auto-brightness mode automatically adjusts screen brightness using ambient light sensors
+- Manual brightness override (0–100) available when auto mode is disabled
+- Screen timeout prevents burn-in and conserves power on idle devices (configurable 30 s – 1 h, or "never")
 
 ### Hospitality and Commercial Deployments
 **Scenario**: Hotels, hospitals, or assisted living facilities

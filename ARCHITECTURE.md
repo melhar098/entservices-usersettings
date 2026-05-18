@@ -101,7 +101,7 @@ Client Update → JSON-RPC Handler → UserSettingsImplementation
 ## Technical Implementation
 
 ### Settings Management
-The plugin manages 18 different user settings categorized into:
+The plugin manages 23 different user settings categorized into:
 
 1. **Audio Settings**
    - Audio description (boolean)
@@ -130,6 +130,13 @@ The plugin manages 18 different user settings categorized into:
 
 5. **Privacy Settings**
    - Privacy mode (string)
+
+6. **Display & Visual Settings**
+   - Display brightness (uint32: 0–100; default 75)
+   - Auto-brightness mode (boolean; default false) — when enabled, manual brightness is ignored and the device adjusts brightness based on ambient light
+   - Color scheme (string: "light" | "dark" | "auto"; default "auto")
+   - Font size (uint32: 12–24; default 16)
+   - Screen timeout (uint32: 0 = never, or 30–3600 seconds; default 300)
 
 ### Thread Safety
 - Uses mutex locks (`_adminLock`) to protect shared data structures
