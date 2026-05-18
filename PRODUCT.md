@@ -106,7 +106,7 @@ For native service integration:
 
 ### Implementation Status
 - The checked-in PR changes add implementation-level getters, setters, and default values for display brightness, auto-brightness mode, color scheme, font size, and screen timeout
-- **[Verification Needed]** Matching public `IUserSettings`, JSON-RPC registration, notification wiring, and inspector-map exposure for these display settings are not visible in the checked-in source diff
+- **[Verification Needed]** Confirm that matching public `IUserSettings` methods, JSON-RPC registration, notification wiring, and inspector-map entries exist for these display settings in the wider codebase
 
 ### Integration Benefits
 1. **Zero-Configuration Discovery**: Automatic discovery via Thunder framework

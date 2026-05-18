@@ -91,7 +91,8 @@ Client Update → JSON-RPC Handler → UserSettingsImplementation
   - color scheme: `light`, `dark`, or `auto`
   - font size: `12-24`
   - screen timeout: `0` or `30-3600`
-- When auto-brightness mode is enabled, `SetDisplayBrightness()` emits a `LOGWARN` message stating that manual brightness will be ignored until auto mode is disabled, but the method still validates the input and persists the requested value through `SetUserSettingsValue()`
+- When auto-brightness mode is enabled, `SetDisplayBrightness()` emits a `LOGWARN` message stating that manual brightness will be ignored until auto mode is disabled.
+- However, the method still validates the input and persists the requested value through `SetUserSettingsValue()`
 - See `PRODUCT.md` -> `Implementation Status` for the consolidated public-interface verification note for these display settings
 
 ## Plugin Framework Integration
