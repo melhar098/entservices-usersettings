@@ -78,6 +78,22 @@ Client Update → JSON-RPC Handler → UserSettingsImplementation
 → Broadcast to Registered Clients
 ```
 
+### Display Preference Implementation Note
+- PR #62 adds display preference storage and validation logic directly in `UserSettingsImplementation`
+- New persisted keys introduced by the implementation are:
+  - `displayBrightness` (default `75`)
+  - `colorScheme` (default `auto`)
+  - `fontSize` (default `16`)
+  - `autoBrightnessMode` (default `false`)
+  - `screenTimeout` (default `300`)
+- Validation implemented in the source:
+  - brightness: `0-100`
+  - color scheme: `light`, `dark`, or `auto`
+  - font size: `12-24`
+  - screen timeout: `0` or `30-3600`
+- When auto-brightness mode is enabled, `SetDisplayBrightness()` still validates and stores the requested value, while logging that manual brightness will be ignored until auto mode is disabled
+- **[Verification Needed]** Matching `IUserSettings`, JSON-RPC registration, notification wiring, and inspector-map exposure for these display settings are not visible in the checked-in PR diff
+
 ## Plugin Framework Integration
 
 ### Thunder Framework Integration
@@ -101,7 +117,7 @@ Client Update → JSON-RPC Handler → UserSettingsImplementation
 ## Technical Implementation
 
 ### Settings Management
-The plugin manages 18 different user settings categorized into:
+The plugin manages 23 persisted default-backed settings categorized into:
 
 1. **Audio Settings**
    - Audio description (boolean)
@@ -130,6 +146,13 @@ The plugin manages 18 different user settings categorized into:
 
 5. **Privacy Settings**
    - Privacy mode (string)
+
+6. **Display Settings**
+   - Display brightness (unsigned integer, default `75`, valid `0-100`)
+   - Color scheme (string: `light`, `dark`, or `auto`)
+   - Font size (unsigned integer, default `16`, valid `12-24`)
+   - Auto-brightness mode (boolean)
+   - Screen timeout (unsigned integer seconds, default `300`, valid `0` or `30-3600`)
 
 ### Thread Safety
 - Uses mutex locks (`_adminLock`) to protect shared data structures

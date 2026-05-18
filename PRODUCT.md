@@ -7,7 +7,7 @@ The UserSettings plugin provides a unified, persistent user preferences manageme
 ### Core Features
 
 #### Comprehensive Settings Management
-The plugin manages a complete spectrum of user preferences across five key categories:
+The plugin manages a complete spectrum of user preferences across six key categories:
 
 1. **Audio Preferences**
    - Enable/disable audio description for visually impaired users
@@ -36,6 +36,14 @@ The plugin manages a complete spectrum of user preferences across five key categ
 
 5. **Privacy Settings**
    - Privacy mode configuration for data collection preferences
+
+6. **Display Personalization**
+   - Persist a manual display brightness value (default `75`, validated range `0-100`)
+   - Persist an auto-brightness mode toggle (default `false`)
+   - Persist a screen timeout value in seconds (default `300`; `0` disables timeout; otherwise `30-3600`)
+   - Persist a color scheme preference of `light`, `dark`, or `auto` (default `auto`)
+   - Persist a font size preference (default `16`, validated range `12-24`)
+   - **[Verification Needed]** The current PR adds these display settings in `UserSettingsImplementation`, but matching JSON-RPC or `IUserSettings` interface exposure is not visible in the checked-in source diff
 
 #### Real-Time Synchronization
 - Event-driven notification system ensures all applications receive immediate updates when settings change
@@ -74,6 +82,7 @@ The plugin manages a complete spectrum of user preferences across five key categ
 - High contrast mode for users with visual impairments
 - Audio description support for video content
 - Adjustable voice speed accommodates different user needs
+- Display personalization defaults can preserve larger text, automatic brightness behavior, and preferred timeout behavior between sessions when those implementation hooks are consumed by clients
 
 ### Content Management and Compliance
 **Scenario**: Regulatory compliance and content filtering
@@ -89,6 +98,8 @@ The plugin exposes a comprehensive JSON-RPC API with methods for:
 - **Getters**: Retrieve individual settings or bulk settings via Inspector interface
 - **Setters**: Update individual settings with validation
 - **Events**: Real-time notifications for all setting changes
+
+**Display settings note:** the checked-in PR changes add implementation-level getters, setters, and default values for display brightness, auto-brightness mode, color scheme, font size, and screen timeout. **[Verification Needed]** Matching public JSON-RPC registration is not present in the current source diff.
 
 ### COM-RPC Interfaces
 For native service integration:
@@ -149,7 +160,7 @@ For native service integration:
 
 1. **Unified Settings Store**: Single source of truth for all user preferences across the platform
 2. **Real-Time Synchronization**: Immediate cross-application consistency without custom integration
-3. **Comprehensive Coverage**: Covers audio, video, accessibility, parental controls, and privacy in one plugin
+3. **Comprehensive Coverage**: Covers audio, captions, display personalization, accessibility, parental controls, and privacy in one plugin
 4. **Standards-Based**: Leverages Thunder/WPEFramework industry-standard plugin architecture
 5. **Production-Ready**: Battle-tested in commercial RDK deployments worldwide
 6. **Active Development**: Regular updates with new features (v2.3.0 released May 2025)
